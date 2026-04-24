@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>NammaFlow AI GPU Map</title>
+
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <script>
+
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+            center: [77.5946, 12.9716],
+            zoom: 11
+        });
+
+        map.on('load', () => {
+
+            fetch('bangalore_traffic.geojson')
+                .then(res => res.json())
+                .then(data => {
+
+                    map.addSource('traffic', {
+                        type: 'geojson',
+                        data: data
+                    });
+
+                    map.addLayer({
+                        id: 'traffic-layer',
+                        type: 'line',
+                        source: 'traffic',
+                        paint: {
+                            'line-width': 2,
+                            'line-color': [
+                                'interpolate',
+                                ['linear'],
+                                ['get', 'density'],
+                                0, 'green',
+                                0.4, 'orange',
+                                0.7, 'red'
+                            ]
+                        }
+                    });
+
+                });
+
+            // Make Map Interactive
+            let selectedPoints = [];
+            let currentMarkers = [];
+
+            map.on('click', function (e) {
+                selectedPoints.push([e.lngLat.lat, e.lngLat.lng]);
+
+                // Create physical point markers (Blue for start, Red for finish)
+                let marker = new maplibregl.Marker({ color: selectedPoints.length === 1 ? '#3b82f6' : '#ef4444' })
+                    .setLngLat([e.lngLat.lng, e.lngLat.lat])
+                    .addTo(map);
+
+                currentMarkers.push(marker);
+
+                if (selectedPoints.length === 2) {
+                    fetch("http://127.0.0.1:8000/route", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            source: { lat: selectedPoints[0][0], lon: selectedPoints[0][1] },
+                            destination: { lat: selectedPoints[1][0], lon: selectedPoints[1][1] }
+                        })
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (map.getSource('dynamic-route')) {
+                                map.getSource('dynamic-route').setData({
+                                    type: "Feature",
+                                    geometry: { type: "LineString", coordinates: data.route }
+                                });
+                            } else {
+                                map.addSource('dynamic-route', {
+                                    type: 'geojson',
+                                    data: {
+                                        type: "Feature",
+                                        geometry: { type: "LineString", coordinates: data.route }
+                                    }
+                                });
+                                map.addLayer({
+                                    id: 'dynamic-route-layer',
+                                    type: 'line',
+                                    source: 'dynamic-route',
+                                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                                    paint: {
+                                        'line-color': '#00FFAA',
+                                        'line-width': 6,
+                                        'line-opacity': 0.85
+                                    }
+                                });
+                            }
+                        });
+
+                    // Reset array but leave markers briefly or clear them if you want continuous clicking
+                    selectedPoints = [];
+                    setTimeout(() => {
+                        currentMarkers.forEach(m => m.remove());
+                        currentMarkers = [];
+                    }, 10000); // Clear markers after 10s
+                }
+            });
+
+        });
+
+    </script>
+
+</body>
+
+</html>

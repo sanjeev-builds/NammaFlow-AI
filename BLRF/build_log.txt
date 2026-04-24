@@ -1,0 +1,28 @@
+
+> my-project@0.1.0 build C:\Users\Sanjeev\Desktop\STACK\BLRCONGEST\BLRF
+> next build
+
+▲ Next.js 16.2.0 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.4s
+  Skipping validation of types
+  Finished TypeScript config validation in 8ms ...
+  Collecting page data using 4 workers ...
+  Generating static pages using 4 workers (0/3) ...
+Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/Desktop_STACK_BLRCONGEST_BLRF_0hfasd8._.js from module 24615
+    at Context.loadChunkAsync [as l] (C:\Users\Sanjeev\Desktop\STACK\BLRCONGEST\BLRF\.next\server\chunks\ssr\[turbopack]_runtime.js:766:27) {
+  digest: '2588740232',
+  [cause]: SyntaxError: Identifier 'l' has already been declared
+      at <unknown> (C:\Users\Sanjeev\Desktop\STACK\BLRCONGEST\BLRF\.next\server\chunks\ssr\Desktop_STACK_BLRCONGEST_BLRF_0hfasd8._.js:15)
+}
+Error occurred prerendering page "/". Read more: https://nextjs.org/docs/messages/prerender-error
+Error [ChunkLoadError]: Failed to load chunk server/chunks/ssr/Desktop_STACK_BLRCONGEST_BLRF_0hfasd8._.js from module 24615
+    at Context.loadChunkAsync [as l] (C:\Users\Sanjeev\Desktop\STACK\BLRCONGEST\BLRF\.next\server\chunks\ssr\[turbopack]_runtime.js:766:27) {
+  digest: '2588740232',
+  [cause]: SyntaxError: Identifier 'l' has already been declared
+      at <unknown> (C:\Users\Sanjeev\Desktop\STACK\BLRCONGEST\BLRF\.next\server\chunks\ssr\Desktop_STACK_BLRCONGEST_BLRF_0hfasd8._.js:15)
+}
+Export encountered an error on /page: /, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
+ ELIFECYCLE  Command failed with exit code 1.

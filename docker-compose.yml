@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb-ha:pg14-latest
+    container_name: nammaflow_db
+    environment:
+      POSTGRES_USER: nammaflow_admin
+      POSTGRES_PASSWORD: super_secure_password
+      POSTGRES_DB: traffic_telemetry
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  timescaledb_data:
