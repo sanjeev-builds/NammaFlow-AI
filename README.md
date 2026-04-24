@@ -151,3 +151,14 @@ PYTHONPATH=src python scripts/run_engine.py
 - **Day 5:** Add alert rules (critical crowd density, emergency corridor conflicts).
 - **Day 6:** Add REST endpoints for traffic-command dashboard integration.
 - **Day 7:** Run event simulation and compare baseline vs adaptive delay metrics.
+
+## 📄 License & Copyright
+
+**Copyright (c) 2026 Sanjeev. All Rights Reserved.**
+
+This project is made public strictly for **portfolio demonstration and evaluation purposes**. 
+
+You are welcome to read the code to assess my skills. However, **you are not allowed to copy, clone, distribute, or modify** any portion of this codebase for academic, personal, or commercial use without my explicit written permission.
+
+See the [LICENSE](LICENSE) file for more details.
+
