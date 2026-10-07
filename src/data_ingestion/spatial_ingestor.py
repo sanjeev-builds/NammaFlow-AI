@@ -37,12 +37,14 @@ class TomTomSpatialIngestor:
                                 print(f"[TOMTOM-DAEMON] {name}: {current_speed}km/h (Intensity: {congestion}/10)")
                                 
                                 # Send to our main API to update the map live!
+                                # NOTE: traffic_ai.api's POST /traffic expects a JSON array of
+                                # TrafficEvent objects (list[TrafficEvent]), not a single object.
                                 try:
-                                    await session.post("http://localhost:8000/traffic", json={
+                                    await session.post("http://localhost:8000/traffic", json=[{
                                         "location": name,
                                         "congestion_score": congestion,
                                         "speed": current_speed
-                                    })
+                                    }])
                                 except: pass
                             else:
                                 print(f"[TOMTOM-DAEMON] API Error {response.status} for {name}")

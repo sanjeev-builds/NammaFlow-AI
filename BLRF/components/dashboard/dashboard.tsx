@@ -27,8 +27,13 @@ import { PredictiveTimeline } from "./predictive-timeline"
 import { AIExplainability } from "./ai-explainability"
 import { OptimizationControl } from "./optimization-control"
 import { RiskZoneAlerts } from "./risk-zone-alerts"
-import { TrafficChart } from "./traffic-chart"
 import { AIAssistant } from "./ai-assistant"
+
+const TrafficChart = dynamic(
+  () => import("./traffic-chart").then(mod => mod.TrafficChart),
+  { ssr: false }
+)
+
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
 import { X, ChevronLeft, MapPin, TrendingUp, Brain, Settings2 } from "lucide-react"
@@ -353,7 +358,9 @@ export function Dashboard() {
 
                       <TabsContent value="analysis" className="m-0 space-y-4">
                         <AIExplainability zone={selectedZone || zones.find(z => z.risk) || zones[0]} />
-                        <TrafficChart zones={zones} />
+                        <div className="min-h-[250px]">
+                          <TrafficChart zones={zones} />
+                        </div>
                       </TabsContent>
 
                       <TabsContent value="controls" className="m-0 space-y-4">

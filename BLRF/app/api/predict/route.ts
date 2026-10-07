@@ -6,16 +6,23 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
 
-        // Features: speed, vehicle_count, weather, incident_score, eta, hour, is_peak
-        // Defaulting missing values to prevent ML errors
+        // Features: all 9 columns ml/train_model.py was trained on, in that
+        // exact order. Previously only 7 were sent here -- event_intensity
+        // and google_traffic_factor were missing, which made ml/predict.py
+        // build a DataFrame with 2 NaN columns and crash inside
+        // RandomForestClassifier.predict() (plain forests don't accept NaN).
+        // Defaulting missing values to prevent ML errors.
+        const currentHour = body.hour ?? new Date().getHours();
         const features = {
-            speed: body.speed || 30,
-            vehicle_count: body.vehicle_count || 50,
-            weather: body.weather || 0,
-            incident_score: body.incident_score || 0,
-            eta: body.eta || 15,
-            hour: body.hour || new Date().getHours(),
-            is_peak: body.is_peak || (new Date().getHours() >= 8 && new Date().getHours() <= 10 ? 1 : 0),
+            speed: body.speed ?? 30,
+            vehicle_count: body.vehicle_count ?? 50,
+            weather: body.weather ?? 0,
+            incident_score: body.incident_score ?? 0,
+            eta: body.eta ?? 15,
+            hour: currentHour,
+            is_peak: body.is_peak ?? (currentHour >= 8 && currentHour <= 10 ? 1 : 0),
+            event_intensity: body.event_intensity ?? 0,
+            google_traffic_factor: body.google_traffic_factor ?? 1.0,
         };
 
         const pythonScript = path.join(process.cwd(), "..", "ml", "predict.py");

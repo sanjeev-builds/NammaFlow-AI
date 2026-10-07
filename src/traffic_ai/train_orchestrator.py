@@ -8,6 +8,8 @@ import math
 import random
 import torch
 import os
+import json
+import datetime
 from rl_agent import DeepRLRewardEngine, GlobalTrafficState
 from graph_engine import CityGraphPhysics
 
@@ -88,8 +90,11 @@ def run_matrix():
     
     # Using absolute paths to guarantee successful deployment
     weights_path = os.path.join(os.path.dirname(__file__), "global_orchestrator.pth")
+    log_path = os.path.join(os.path.dirname(__file__), "training_log.json")
     best_reward = -999999
-    
+    episode_rewards = []
+    start_time = time.time()
+
     for ep in range(episodes):
         state_dict = reset_env()
         ep_reward = 0
@@ -115,16 +120,34 @@ def run_matrix():
             
         builtins.print = original_print # Restore prints
         epsilon = max(0.1, epsilon * 0.99)
-        
+        episode_rewards.append(round(ep_reward, 2))
+
         if ep_reward > best_reward:
             best_reward = ep_reward
             if torch:
                 torch.save(agent.model.state_dict(), weights_path)
-                
+
         if ep % 20 == 0 or ep == episodes - 1:
             print(f"Episode {ep:03d}/{episodes} | Epsilon: {epsilon:.3f} | System Reward Trend: {ep_reward/100:.2f}")
 
+    duration_s = round(time.time() - start_time, 1)
     print(f"\n✅ TRAINING COMPLETE! Dominant Weights successfully bound to: {weights_path}")
+
+    # Persist a verifiable training log -- previously every number here was
+    # only ever printed to a terminal that closes, so there was nothing
+    # left to point at afterward.
+    with open(log_path, "w") as f:
+        json.dump({
+            "trained_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "episodes": episodes,
+            "steps_per_episode": 100,
+            "duration_seconds": duration_s,
+            "best_episode_reward": round(best_reward, 2),
+            "final_epsilon": round(epsilon, 4),
+            "episode_rewards": episode_rewards,
+            "weights_path": weights_path,
+        }, f, indent=2)
+    print(f"📄 Training log saved to {log_path}")
 
 if __name__ == "__main__":
     run_matrix()

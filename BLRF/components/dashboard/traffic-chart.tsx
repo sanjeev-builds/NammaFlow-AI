@@ -21,8 +21,10 @@ interface TrafficChartProps {
 export function TrafficChart({ zones }: TrafficChartProps) {
   // Fetch hourly data from SQLite Database via FastAPI
   const [hourlyData, setHourlyData] = useState<any[]>([])
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     const fetchHistory = async () => {
       try {
         const response = await fetch("http://localhost:8000/traffic/history")
@@ -67,45 +69,47 @@ export function TrafficChart({ zones }: TrafficChartProps) {
         {/* Speed over time chart */}
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground">Speed Trend (Today)</p>
-          <div className="h-[120px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={hourlyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="speedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="hour"
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={30}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                  formatter={(value: number) => [`${value} km/h`, 'Speed']}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="speed"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  fill="url(#speedGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-[120px] w-full min-w-0">
+            {mounted && (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={hourlyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="speedGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="hour"
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={30}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value: number) => [`${value} km/h`, 'Speed']}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="speed"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    fill="url(#speedGrad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 

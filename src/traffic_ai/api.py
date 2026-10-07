@@ -25,13 +25,49 @@ BASELINE_TRAFFIC = {
     "MG Road":        {"location": "MG Road", "density": 0.55, "timestamp": 0, "congestion_score": 5.5},
 }
 
+def _on_weather_update(is_raining: bool) -> None:
+    """Callback for WeatherIngestor: flips the live rain-mode global
+    from a real OpenWeatherMap poll, no HTTP round-trip needed."""
+    global CURRENT_WEATHER
+    CURRENT_WEATHER = "rain" if is_raining else "clear"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Seed baseline on startup — timestamp=0 means TTL never expires
     for location, data in BASELINE_TRAFFIC.items():
         active_hotspots[location] = data
-        
+
     asyncio.create_task(fetch_predicthq_events())
+
+    # Real external data sources #2 and #3: TomTom (macro speed/flow) and
+    # OpenWeatherMap (rain detection), started only if a key is configured
+    # (both already exist in .env). Each is a standalone daemon from
+    # data_ingestion/ -- previously written but never started anywhere.
+    tomtom_key = os.getenv("TOMTOM_API_KEY")
+    if tomtom_key:
+        from data_ingestion.spatial_ingestor import TomTomSpatialIngestor
+        asyncio.create_task(TomTomSpatialIngestor(api_key=tomtom_key).pull_macro_telemetry())
+
+    weather_key = os.getenv("OPENWEATHER_API_KEY")
+    if weather_key:
+        from data_ingestion.weather_ingestor import WeatherIngestor
+        asyncio.create_task(WeatherIngestor(api_key=weather_key, on_update=_on_weather_update).poll_precipitation())
+
+    # Started here, not via the old @app.on_event("startup") decorator that
+    # used to sit further down this file: current FastAPI/Starlette silently
+    # does not run on_event handlers at all once an app is constructed with
+    # an explicit `lifespan=` context manager, so that thread never actually
+    # started -- GLOBAL_MULTI_STATE stayed {} forever and every endpoint
+    # that read it was permanently on the KeyError fallback. `threading` and
+    # `background_multi_vision_loop` are resolved at CALL time (the whole
+    # module -- including that function's def, further down this file --
+    # has already finished executing by the time lifespan() actually runs
+    # at app startup), so the forward reference here is safe.
+    import threading
+    print("Initializing Phase 1 Multi-Vision Deterministic Thread...")
+    threading.Thread(target=background_multi_vision_loop, daemon=True).start()
+
     yield
 
 # MLOps: Initialize the FastAPI Application
@@ -122,12 +158,6 @@ def background_multi_vision_loop():
             print("Multi-Vision Async Failure:", e)
         time.sleep(0.5)
 
-@app.on_event("startup")
-def startup_yolo():
-    print("Initializing Phase 1 Multi-Vision Deterministic Thread...")
-    t = threading.Thread(target=background_multi_vision_loop, daemon=True)
-    t.start()
-
 class PhaseOneProvider(SnapshotProvider):
     """Zero-Latency bridge extracting deterministic YOLO physics from the background state."""
     def get_snapshot(self, intersection_id: str) -> IntersectionSnapshot:
@@ -206,27 +236,11 @@ def get_live_decision(intersection_id: str, weather: str = "clear"):
     mock_provider.weather_mode = weather
     
     decision = engine.run_once(intersection_id)
-    
-    # === GRAPH DISPATCH PROTOCOL (PHASE 2)
-    vision_target = "silk_board" if intersection_id == "mg_road" else intersection_id
-    if vision_target in GLOBAL_MULTI_STATE:
-        data = GLOBAL_MULTI_STATE[vision_target]
-        # Only dispatch if signal favors traffic clearing and density warrants flow
-        # Bounding Outflow to Inflow Conservation
-        if decision.plan.green_seconds >= 30 and data["density"] > 0.1:
-            # 🚨 HARD CONSTRAINT (SAFETY INTERLOCK MATRIX)
-            downstream_node = "madiwala" if vision_target == "silk_board" else "koramangala"
-            if downstream_node in GLOBAL_MULTI_STATE and GLOBAL_MULTI_STATE[downstream_node]["density"] > 0.9:
-                pass # RL Override: Block Dispatch to prevent terminal gridlock spiral
-            else:
-                throughput_released = int(max(1, min(data["vehicles"], data["flow"] * 0.05)))
-                city_graph.dispatch_wave(
-                    source=vision_target,
-                    throughput=throughput_released,
-                    current_speed_kmh=data["speed"]
-                )
-    
+
     # === GLOBAL REINFORCEMENT LEARNING BRIDGE (PHASE 3) ===
+    # Computed BEFORE the graph dispatch block below, so dispatch sees the
+    # FINAL green time (post RL-override, if any), not the pre-override one.
+    vision_target = "silk_board" if intersection_id == "mg_road" else intersection_id
     try:
         densities = [
             GLOBAL_MULTI_STATE["silk_board"]["density"],
@@ -244,7 +258,51 @@ def get_live_decision(intersection_id: str, weather: str = "clear"):
 
     rl_state = GlobalTrafficState(densities=densities, flows=flows)
     marl_reward = rl_engine.calculate_reward(rl_state)
-    
+
+    # The DQN actually DRIVES the signal decision for the 3 globally-
+    # orchestrated junctions -- but only for ordinary congestion-pressure
+    # cases. Emergency vehicle / monsoon / critical-event overrides always
+    # win; the learned policy never gets to veto a safety rule.
+    SAFE_PRESSURE_REASONS = {
+        "Low congestion pressure", "Moderate congestion pressure",
+        "High congestion pressure", "Severe congestion pressure",
+    }
+    RL_ACTION_LABELS = {0: "Decrease", 1: "Maintain", 2: "Increase", 3: "Force_Flush"}
+    rl_action = None
+    if vision_target in ("silk_board", "madiwala", "koramangala") and decision.plan.reason in SAFE_PRESSURE_REASONS:
+        rl_action = rl_engine.act(rl_state, epsilon=0.0)
+        span = controller.max_green - controller.min_green
+        rl_green_by_action = {
+            0: controller.min_green,
+            1: int(controller.min_green + span * 0.35),
+            2: int(controller.min_green + span * 0.65),
+            3: controller.max_green,
+        }
+        decision.plan.green_seconds = rl_green_by_action[rl_action]
+        decision.plan.red_seconds = max(controller.cycle_time - decision.plan.green_seconds, 10)
+        decision.plan.reason = (
+            f"DQN Global Orchestrator: {RL_ACTION_LABELS[rl_action]} "
+            f"(system reward={round(marl_reward, 1)})"
+        )
+
+    # === GRAPH DISPATCH PROTOCOL (PHASE 2)
+    if vision_target in GLOBAL_MULTI_STATE:
+        data = GLOBAL_MULTI_STATE[vision_target]
+        # Only dispatch if signal favors traffic clearing and density warrants flow
+        # Bounding Outflow to Inflow Conservation
+        if decision.plan.green_seconds >= 30 and data["density"] > 0.1:
+            # 🚨 HARD CONSTRAINT (SAFETY INTERLOCK MATRIX)
+            downstream_node = "madiwala" if vision_target == "silk_board" else "koramangala"
+            if downstream_node in GLOBAL_MULTI_STATE and GLOBAL_MULTI_STATE[downstream_node]["density"] > 0.9:
+                pass # RL Override: Block Dispatch to prevent terminal gridlock spiral
+            else:
+                throughput_released = int(max(1, min(data["vehicles"], data["flow"] * 0.05)))
+                city_graph.dispatch_wave(
+                    source=vision_target,
+                    throughput=throughput_released,
+                    current_speed_kmh=data["speed"]
+                )
+
     return {
         "intersection": intersection_id,
         "features": {
@@ -258,7 +316,8 @@ def get_live_decision(intersection_id: str, weather: str = "clear"):
             "red": decision.plan.red_seconds,
             "reason": decision.plan.reason,
             "weather": decision.snapshot.weather,
-            "rl_reward_score": marl_reward
+            "rl_reward_score": marl_reward,
+            "rl_action": RL_ACTION_LABELS.get(rl_action) if rl_action is not None else None
         }
     }
 
@@ -397,7 +456,7 @@ import urllib.request
 import json
 import datetime
 
-PREDICTHQ_TOKEN = "RRuNOWcrmdoyLwl6C4ritN8XLvnlbz_CqBL65jVZ"
+PREDICTHQ_TOKEN = os.getenv("PREDICTHQ_API_KEY", "")
 
 async def fetch_predicthq_events():
     global live_event_cards

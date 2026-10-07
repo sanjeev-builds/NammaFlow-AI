@@ -49,12 +49,21 @@ class DeepRLRewardEngine:
             self.optimizer = optim.Adam(self.model.parameters(), lr=1e-4) # Resilient Learning Rate
             self.criterion = nn.MSELoss()
             
-            self.weights_path = "global_orchestrator.pth"
+            # Absolute path anchored to this file's own directory -- previously
+            # a bare relative "global_orchestrator.pth", which only resolved
+            # correctly if the process happened to be launched with this
+            # directory as its cwd. train_orchestrator.py already saves here
+            # (os.path.dirname(__file__)); loading now matches that exactly,
+            # regardless of where uvicorn/the API process is started from.
+            self.weights_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "global_orchestrator.pth")
             if os.path.exists(self.weights_path):
                 try:
                     self.model.load_state_dict(torch.load(self.weights_path))
+                    print(f"[DQN] Loaded trained weights from {self.weights_path}")
                 except Exception:
                     print("Initialized Fresh Global Matrix.")
+            else:
+                print(f"[DQN] No trained weights found at {self.weights_path} -- using fresh random init.")
 
     def act(self, global_state: GlobalTrafficState, epsilon: float = 0.0) -> int:
         if torch:

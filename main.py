@@ -31,15 +31,15 @@ active_hotspots = {
     "Electronic City Phase 1": {"location": "Electronic City Phase 1", "lat": 12.8468, "lon": 77.6769, "speed": 15, "congestion_score": 7.5}
 }
 
-print("📡 Loading NammaFlow AI road network into Memory for fast routing...")
+print("[SIGNAL] Loading NammaFlow AI road network into Memory for fast routing...")
 try:
     G_route = ox.graph_from_place("Bangalore, India", network_type="drive", simplify=True)
     for u, v, k, data in G_route.edges(keys=True, data=True):
         data["weight"] = data.get("length", 1)  # base weight fallback
-    print("✅ Routing Engine Ready!")
+    print("[ROUTING] Routing Engine Ready!")
 except Exception as e:
     G_route = None
-    print(f"⚠️ Warning: Routing Engine did not initialize fully ({e})")
+    print(f"[WARNING] Routing Engine did not initialize fully ({e})")
 
 class LocationPoint(BaseModel):
     lat: float
@@ -102,7 +102,7 @@ def compute_route(req: RouteRequest):
             "warning": None
         }
     except Exception as e:
-        print("❌ Route calculation error:", e)
+        print("[ERROR] Route calculation error:", e)
         return {"route": []}
 
 import sqlite3

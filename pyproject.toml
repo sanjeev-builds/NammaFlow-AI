@@ -13,7 +13,18 @@ dependencies = [
     "ultralytics",
     "requests",
     "fastapi",
-    "uvicorn"
+    "uvicorn",
+    # Previously used by src/traffic_ai/api.py, ml/, and the data_ingestion
+    # daemons but never actually declared here.
+    "pandas",
+    "scikit-learn",
+    "joblib",
+    "torch",
+    "networkx",
+    "osmnx",
+    "aiohttp",
+    "httpx",
+    "python-dotenv",
 ]
 
 [tool.setuptools.packages.find]
