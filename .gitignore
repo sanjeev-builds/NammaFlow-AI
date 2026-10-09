@@ -43,3 +43,6 @@ htmlcov/
 # Documents
 *.pptx
 *.pdf
+
+# Local data
+/data/
